@@ -10,21 +10,66 @@ public static class PolyMatcherExtensions
         var centroid = GetCentroid(vertices);
 
         // Order points by distance from the centroid
-        var ordered = vertices.OrderBy(v => v.EuclideanDistance(centroid)).ToList();
+        List<(Vertex vertex, float euclideanDistance)> orderedVertices = vertices.Select(v => (v, v.EuclideanDistance(centroid))).OrderByDescending(v => v.Item2).ToList();
 
-        // Create the output array containing
-        var angles = new float[ordered.Count];
+        var furthestDistance = orderedVertices[0].euclideanDistance;
+
+        // Normalize all vertices about the centroid
+        for (var i = 0; i < orderedVertices.Count; i++)
+        {
+            var unscaled = orderedVertices[i].vertex;
+            var scaledVertex = new Vertex(centroid.X + (unscaled.X - centroid.X) / furthestDistance,
+                centroid.Y + (unscaled.Y - centroid.Y) / furthestDistance);
+            orderedVertices[i] = (scaledVertex, scaledVertex.EuclideanDistance(centroid));
+        }
+
+        // Create the output array
+        var angles = new float[orderedVertices.Count];
 
         // For each pair of vertices calculate the angle a-b-c where b is the centroid
-        for (var i = 0; i < ordered.Count; i++)
+        for (var i = 0; i < orderedVertices.Count; i++)
         {
-            var v1 = ordered[i];
-            // If there are an odd number of vertices pair the last vertex with the first
-            var v2 = (i + 1) < ordered.Count ? ordered[i + 1] : ordered[0];
+            var vertexA = orderedVertices[i];
+            var vectorAB = new Vertex(vertexA.vertex.X - centroid.X, vertexA.vertex.Y - centroid.Y);
 
-            var a = new Vertex(v1.X - centroid.X, v1.Y - centroid.Y);
-            var c = new Vertex(v2.X - centroid.X, v2.Y - centroid.Y);
-            angles[i] = a.AngleTo(c);
+            // If there are an odd number of vertices pair the last vertex with the first
+            var vertexC = (i + 1) < orderedVertices.Count ? orderedVertices[i + 1] : orderedVertices[0];
+            var vectorCB = new Vertex(vertexC.vertex.X - centroid.X, vertexC.vertex.Y - centroid.Y);
+            
+            var minAngle = vectorAB.AngleTo(vectorCB);
+            var euclideanDistance = vertexC.euclideanDistance;
+            if (i + 1 < orderedVertices.Count)
+            {
+                var minIndex = i + 1;
+
+                // If there are more vertices with the same euclidean distance choose the vertex with the smallest angle a-b-c
+                // This solves the issue when multiple vertices have the same euclidean distance from the centroid
+                for (var j = i + 2; j < orderedVertices.Count; j++)
+                {
+                    vertexC = orderedVertices[j];
+                    if (vertexC.euclideanDistance - euclideanDistance > 0.01f)
+                    {
+                        // Euclidean distance varies sufficiently, break
+                        break;
+                    }
+                    
+                    vectorCB = new Vertex(vertexC.vertex.X - centroid.X, vertexC.vertex.Y - centroid.Y);
+                    var angle = vectorAB.AngleTo(vectorCB);
+                    if (angle >= minAngle)
+                    {
+                        continue;
+                    }
+
+                    // Angle is smaller
+                    minIndex = j;
+                    minAngle = angle;
+                }
+
+                // Swap the current vertex with the new one
+                (orderedVertices[i + 1], orderedVertices[minIndex]) = (orderedVertices[minIndex], orderedVertices[i + 1]);
+            }
+            
+            angles[i] = minAngle * minAngle * vertexA.euclideanDistance * vertexC.euclideanDistance;
         }
 
         return angles;
