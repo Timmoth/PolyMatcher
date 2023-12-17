@@ -13,11 +13,10 @@ public static class PolyMatcherExtensions
         var ordered = vertices.OrderBy(v => v.EuclideanDistance(centroid)).ToList();
 
         // Create the output array containing
-        var angles = new float[(int)Math.Ceiling(ordered.Count / 2.0f)];
+        var angles = new float[ordered.Count];
 
-        var angleIndex = 0;
         // For each pair of vertices calculate the angle a-b-c where b is the centroid
-        for (var i = 0; i < ordered.Count; i += 2)
+        for (var i = 0; i < ordered.Count; i++)
         {
             var v1 = ordered[i];
             // If there are an odd number of vertices pair the last vertex with the first
@@ -25,7 +24,7 @@ public static class PolyMatcherExtensions
 
             var a = new Vertex(v1.X - centroid.X, v1.Y - centroid.Y);
             var c = new Vertex(v2.X - centroid.X, v2.Y - centroid.Y);
-            angles[angleIndex++] = a.AngleTo(c);
+            angles[i] = a.AngleTo(c);
         }
 
         return angles;
